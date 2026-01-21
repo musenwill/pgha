@@ -24,3 +24,4 @@ sleep 5
 
 # 2. 启动 patroni (它会拉起 postgres)
 exec /home/postgres/src/pkg/patroni /home/postgres/${NODE_NAME}/patroni.yml
+

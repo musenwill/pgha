@@ -1,0 +1,61 @@
+scope: pgha
+namespace: /service/
+name: node2
+
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: node2:8008
+
+etcd3:
+  hosts:
+    - node1:2379
+    - node2:2379
+    - node3:2379
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    postgresql:
+      use_pg_rewind: true
+      stop_graceful: true
+      use_slots: true
+      parameters:
+        wal_level: replica
+        hot_standby: "on"
+        max_wal_senders: 10
+        max_replication_slots: 10
+  initdb:
+    - encoding: UTF8
+
+postgresql:
+  callbacks:
+    on_start: /home/postgres/has_vip.sh
+    on_stop: /home/postgres/has_vip.sh
+    on_role_change: /home/postgres/has_vip.sh
+  listen: 0.0.0.0:5432
+  connect_address: node2:5432
+  data_dir: /data/postgres
+  bin_dir: /home/postgres/src/pkg/postgres/bin
+  authentication:
+    superuser:
+      username: postgres
+      password: postgres_pass
+    replication:
+      username: replicator
+      password: repl_pass
+    rewind:
+      username: rewind_user
+      password: rewind_pass
+  pg_hba:
+    - host replication replicator all md5
+    - host all all 0.0.0.0/0 md5
+
+tags:
+  clonefrom: true
+  failover_priority: 1
+  noloadbalance: false
+  nostream: false
+  nosync: false
+  sync_priority: 1

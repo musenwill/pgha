@@ -31,5 +31,3 @@ docker exec -it pgha-node1 /home/postgres/src/pkg/patronictl -c /home/postgres/n
 ```
 docker exec -it pgha-node3 ip a
 ```
-
-## 

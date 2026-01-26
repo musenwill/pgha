@@ -1,0 +1,83 @@
+services:
+  node1:
+    image: pgha_centos:260121
+    container_name: pgha-node1
+    hostname: node1
+    environment:
+      NODE_NAME: node1
+      NODE_IP: node1
+    volumes:
+      - /home/musenwill/pgha:/home/postgres
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    networks:
+      pgha_net:
+        aliases:
+          - node1
+    ports:
+      - "8008:8008"
+    user: "postgres:postgres"
+    entrypoint: ["/home/postgres/compose2/entrypoint.sh"]
+
+  node2:
+    image: pgha_centos:260121
+    container_name: pgha-node2
+    hostname: node2
+    environment:
+      NODE_NAME: node2
+      NODE_IP: node2
+    volumes:
+      - /home/musenwill/pgha:/home/postgres
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    networks:
+      pgha_net:
+        aliases:
+          - node2
+    user: "postgres:postgres"
+    entrypoint: ["/home/postgres/compose2/entrypoint.sh"]
+
+  node3:
+    image: pgha_centos:260121
+    container_name: pgha-node3
+    hostname: node3
+    environment:
+      NODE_NAME: node3
+      NODE_IP: node3
+    volumes:
+      - /home/musenwill/pgha:/home/postgres
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    networks:
+      pgha_net:
+        aliases:
+          - node3
+    user: "postgres:postgres"
+    entrypoint: ["/home/postgres/compose2/entrypoint.sh"]
+
+  client:
+    image: pgha_centos:260121
+    container_name: pgha-client
+    hostname: client
+    environment:
+      NODE_NAME: client
+      NODE_IP: client
+    volumes:
+      - /home/musenwill/pgha:/home/postgres
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    networks:
+      pgha_net:
+        aliases:
+          - client
+    entrypoint: ["fish"]
+    stdin_open: true
+    tty: true
+
+networks:
+  pgha_net:
+    driver: bridge

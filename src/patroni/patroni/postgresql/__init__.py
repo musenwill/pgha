@@ -268,6 +268,12 @@ class Postgresql(object):
             self._available_gucs = self._get_gucs()
         return self._available_gucs
 
+    def postmaster_pid(self) -> int:
+        """return < 0 if have no postmaster process."""
+        if self._postmaster_proc:
+            return self._postmaster_proc.pid
+        return -1
+
     def _version_file_exists(self) -> bool:
         return not self.data_directory_empty() and os.path.isfile(self._version_file)
 

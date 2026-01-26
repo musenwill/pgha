@@ -23,6 +23,7 @@ from .postgresql.rewind import Rewind
 from .quorum import QuorumStateResolver
 from .tags import Tags
 from .utils import parse_int, polling_loop, tzutc
+from .postmaster_phony import PostmasterPhonyMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +264,9 @@ class Ha(object):
 
         # used only in backoff after failing a pre_promote script
         self._released_leader_key_timestamp = 0
+
+        self._postmaster_phony_checker = PostmasterPhonyMonitor(patroni.postgresql)
+        self._postmaster_phony_checker.start()
 
     def primary_stop_timeout(self) -> Union[int, None]:
         """:returns: "primary_stop_timeout" from the global configuration or `None` when not in synchronous mode."""
@@ -2274,6 +2278,11 @@ class Ha(object):
                     self.state_handler.set_state(PostgresqlState.CRASHED)
                 # try to start dead postgres
                 return self.recover()
+
+            if self.has_lock() and self._postmaster_phony_checker.is_phony():
+                """Demote when found postmaster of primary is phony."""
+                self.demote("immediate")
+                return 'demote as detect phony of postmaster process.'
 
             if self.cluster.is_unlocked():
                 ret = self.process_unhealthy_cluster()

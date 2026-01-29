@@ -16,10 +16,16 @@ sudo /usr/sbin/arping -c 3 -I eth0 -s 172.18.0.210 -172.18.0.1
 docker exec -it pgha-node1 /home/postgres/src/pkg/patronictl -c /home/postgres/node1/patroni.yml list
 ```
 
-## 主动切主
+## switchover
 ```
 docker exec -it pgha-node1 /home/postgres/src/pkg/patronictl -c /home/postgres/node1/patroni.yml switchover --leader node2 --candidate node1 --force
 ```
+
+## failover
+```
+docker exec -it pgha-node1 /home/postgres/src/pkg/patronictl -c /home/postgres/node1/patroni.yml failover --candidate node1 --force
+```
+
 
 ## 查看 vip
 ```

@@ -536,6 +536,103 @@ class RestApiHandler(BaseHTTPRequestHandler):
         response.pop('latest_end_lsn', None)
         self._write_status_response(200, response)
 
+    def do_GET_cpu(self) -> None:
+        """Handle a ``GET`` request to ``/cpu`` path by returning the last sampled CPU usage."""
+        patroni = self.server.patroni
+        response: Dict[str, Any] = {}
+        try:
+            cm = getattr(patroni.ha, '_cpu_monitor', None)
+            if cm is not None:
+                usage = cm.cpu_usage
+                if usage is not None:
+                    response['usage'] = usage
+                try:
+                    response['limit'] = cm.limit
+                except Exception:
+                    pass
+                updated = cm.updated_at
+                if updated is not None:
+                    try:
+                        response['updated_at'] = updated.isoformat()
+                    except Exception:
+                        response['updated_at'] = str(updated)
+        except Exception:
+            logger.exception('Exception while handling /cpu')
+        self._write_json_response(200, response)
+
+    def do_GET_mem(self) -> None:
+        """Handle a ``GET`` request to ``/mem`` path by returning the last sampled memory usage."""
+        patroni = self.server.patroni
+        response: Dict[str, Any] = {}
+        try:
+            mm = getattr(patroni.ha, '_mem_monitor', None)
+            if mm is not None:
+                usage = mm.mem_usage
+                if usage is not None:
+                    response['usage'] = usage
+                try:
+                    response['limit'] = mm.limit
+                except Exception:
+                    pass
+                updated = mm.updated_at
+                total = mm.mem_total
+                if total is not None:
+                    response['total'] = total
+                if updated is not None:
+                    try:
+                        response['updated_at'] = updated.isoformat()
+                    except Exception:
+                        response['updated_at'] = str(updated)
+        except Exception:
+            logger.exception('Exception while handling /mem')
+        self._write_json_response(200, response)
+
+    def do_GET_disk(self) -> None:
+        """Handle a ``GET`` request to ``/disk`` path by returning the last sampled disk usage."""
+        patroni = self.server.patroni
+        response: Dict[str, Any] = {}
+        try:
+            dm = getattr(patroni.ha, '_disk_monitor', None)
+            if dm is not None:
+                usage = dm.disk_usage
+                if usage is not None:
+                    response['usage'] = usage
+                try:
+                    response['limit'] = dm.limit
+                except Exception:
+                    pass
+                updated = dm.updated_at
+                total = dm.disk_total
+                if total is not None:
+                    response['total'] = total
+                if updated is not None:
+                    try:
+                        response['updated_at'] = updated.isoformat()
+                    except Exception:
+                        response['updated_at'] = str(updated)
+        except Exception:
+            logger.exception('Exception while handling /disk')
+        self._write_json_response(200, response)
+
+    def do_GET_logsize(self) -> None:
+        """Handle a ``GET`` request to ``/logsize`` path by returning the last sampled log size."""
+        patroni = self.server.patroni
+        response: Dict[str, Any] = {}
+        try:
+            dm = getattr(patroni.ha, '_log_monitor', None)
+            if dm is not None:
+                response['usage'] = dm.log_size
+                response['limit'] = dm.limit
+                updated = dm.updated_at
+                if updated is not None:
+                    try:
+                        response['updated_at'] = updated.isoformat()
+                    except Exception:
+                        response['updated_at'] = str(updated)
+        except Exception:
+            logger.exception('Exception while handling /logsize')
+        self._write_json_response(200, response)
+
     def do_GET_cluster(self) -> None:
         """Handle a ``GET`` request to ``/cluster`` path.
 

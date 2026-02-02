@@ -68,7 +68,7 @@ from .exceptions import PatroniException
 from .postgresql.misc import postgres_version_to_int, PostgresqlRole, PostgresqlState
 from .postgresql.mpp import get_mpp
 from .request import PatroniRequest
-from .utils import cluster_as_json, patch_config, polling_loop
+from .utils import cluster_as_json, patch_config, polling_loop, format_human_size
 from .version import __version__
 
 CONFIG_DIR_PATH = click.get_app_dir('patroni')
@@ -2228,6 +2228,126 @@ def show_config(cluster_name: str, group: Optional[int]) -> None:
     if cluster.config:
         click.echo(format_config_for_editing(cluster.config.data))
 
+
+@ctl.group('show', help='Show various information')
+def show() -> None:  # pragma: no cover - wrapper for subcommands
+    pass
+
+
+@show.command('cpu', help='Show CPU usage for cluster members')
+@arg_cluster_name
+@option_default_citus_group
+def show_cpu(cluster_name: str, group: Optional[int]) -> None:
+    """Process ``show cpu`` command of ``patronictl`` utility.
+
+    Query each cluster member's REST API for `/cpu` and display the info.
+    """
+    cluster = get_dcs(cluster_name, group).get_cluster()
+    for m in get_all_members_leader_first(cluster):
+        if not m.api_url:
+            continue
+        try:
+            response = request_patroni(m, 'get', 'cpu')
+            data = json.loads(response.data.decode('utf-8'))
+            click.echo("{0}: usage={1} limit={2} updated_at={3}".format(
+                m.name, data.get('usage'), data.get('limit'), data.get('updated_at')))
+        except Exception as e:
+            click.echo("{0}: error {1}".format(m.name, e))
+
+
+@show.command('mem', help='Show memory usage for cluster members')
+@arg_cluster_name
+@option_default_citus_group
+def show_mem(cluster_name: str, group: Optional[int]) -> None:
+    """Process ``show mem`` command of ``patronictl`` utility.
+
+    Query each cluster member's REST API for `/mem` and display the info.
+    """
+    cluster = get_dcs(cluster_name, group).get_cluster()
+    for m in get_all_members_leader_first(cluster):
+        if not m.api_url:
+            continue
+        try:
+            response = request_patroni(m, 'get', 'mem')
+            data = json.loads(response.data.decode('utf-8'))
+            total = data.get('total')
+            if total is None:
+                total_str = 'N/A'
+            else:
+                try:
+                    total_str = format_human_size(total)
+                except Exception:
+                    total_str = str(total)
+            click.echo("{0}: usage={1} limit={2} total={3} updated_at={4}".format(
+                m.name, data.get('usage'), data.get('limit'), total_str, data.get('updated_at')))
+        except Exception as e:
+            click.echo("{0}: error {1}".format(m.name, e))
+
+
+@show.command('disk', help='Show disk usage for cluster members')
+@arg_cluster_name
+@option_default_citus_group
+def show_disk(cluster_name: str, group: Optional[int]) -> None:
+    """Process ``show disk`` command of ``patronictl`` utility.
+
+    Query each cluster member's REST API for `/disk` and display the info.
+    """
+    cluster = get_dcs(cluster_name, group).get_cluster()
+    for m in get_all_members_leader_first(cluster):
+        if not m.api_url:
+            continue
+        try:
+            response = request_patroni(m, 'get', 'disk')
+            data = json.loads(response.data.decode('utf-8'))
+            total = data.get('total')
+            if total is None:
+                total_str = 'N/A'
+            else:
+                try:
+                    total_str = format_human_size(total)
+                except Exception:
+                    total_str = str(total)
+            click.echo("{0}: usage={1} limit={2} total={3} updated_at={4}".format(
+                m.name, data.get('usage'), data.get('limit'), total_str, data.get('updated_at')))
+        except Exception as e:
+            click.echo("{0}: error {1}".format(m.name, e))
+
+@show.command('log', help='Show log usage for cluster members')
+@arg_cluster_name
+@option_default_citus_group
+def show_logsize(cluster_name: str, group: Optional[int]) -> None:
+    """Process ``show log`` command of ``patronictl`` utility.
+
+    Query each cluster member's REST API for `/logsize` and display the info.
+    """
+    cluster = get_dcs(cluster_name, group).get_cluster()
+    for m in get_all_members_leader_first(cluster):
+        if not m.api_url:
+            continue
+        try:
+            response = request_patroni(m, 'get', 'logsize')
+            data = json.loads(response.data.decode('utf-8'))
+            usage = data.get('usage')
+            limit = data.get('limit')
+            if usage is None:
+                usage_str = 'N/A'
+            else:
+                try:
+                    usage_str = format_human_size(usage)
+                except Exception:
+                    usage_str = str(usage)
+            if limit is None:
+                limit_str = 'N/A'
+            else:
+                try:
+                    limit_str = format_human_size(limit)
+                except Exception:
+                    limit_str = str(limit)
+
+            click.echo("{0}: usage={1} limit={2} updated_at={3}".format(
+                m.name, usage_str, limit_str, data.get('updated_at')))
+        except Exception as e:
+            click.echo("{0}: error {1}".format(m.name, e))
 
 @ctl.command('version', help='Output version of patronictl command or a running Patroni instance')
 @click.argument('cluster_name', required=False)

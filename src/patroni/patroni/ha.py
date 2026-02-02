@@ -23,6 +23,10 @@ from .postgresql.rewind import Rewind
 from .quorum import QuorumStateResolver
 from .tags import Tags
 from .utils import parse_int, polling_loop, tzutc
+from .cpu_monitor import CPUMonitor
+from .mem_monitor import MemMonitor
+from .disk_monitor import DiskMonitor
+from .log_monitor import LogMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +267,31 @@ class Ha(object):
 
         # used only in backoff after failing a pre_promote script
         self._released_leader_key_timestamp = 0
+
+        # start CPU monitor (do not store cpu info in Patroni)
+        try:
+            self._cpu_monitor = CPUMonitor(self, self.dcs.loop_wait)
+            self._cpu_monitor.start()
+        except Exception:
+            logger.exception('Failed to start CPUMonitor')
+        # start Mem monitor
+        try:
+            self._mem_monitor = MemMonitor(self, self.dcs.loop_wait)
+            self._mem_monitor.start()
+        except Exception:
+            logger.exception('Failed to start MemMonitor')
+        # start Disk monitor
+        try:
+            self._disk_monitor = DiskMonitor(self, self.dcs.loop_wait)
+            self._disk_monitor.start()
+        except Exception:
+            logger.exception('Failed to start DiskMonitor')
+        # start Log monitor (postgres .log files)
+        try:
+            self._log_monitor = LogMonitor(self, self.dcs.loop_wait)
+            self._log_monitor.start()
+        except Exception:
+            logger.exception('Failed to start LogMonitor')
 
     def primary_stop_timeout(self) -> Union[int, None]:
         """:returns: "primary_stop_timeout" from the global configuration or `None` when not in synchronous mode."""
@@ -2286,6 +2315,19 @@ class Ha(object):
             # asynchronous processes are running or we know that this is a standby being promoted.
             # But, we don't want to run pg_rewind checks or copy logical slots from itself,
             # therefore we have a couple additional `not is_promoting` checks.
+            # If disk monitor signaled alarm and this node holds the leader lock, set Postgres to read-only.
+            try:
+                dm = getattr(self, '_disk_monitor', None)
+                if self.has_lock() and dm is not None and getattr(dm, 'alarmed', False):
+                    try:
+                        self.state_handler.query("ALTER SYSTEM SET default_transaction_read_only = 'on'")
+                        self.state_handler.query('SELECT pg_reload_conf()')
+                        logger.warning('Set PostgreSQL to read-only because disk monitor alarm is active')
+                    except Exception:
+                        logger.exception('Failed to set PostgreSQL to read-only due to disk alarm')
+            except Exception:
+                logger.exception('Exception while honoring DiskMonitor alarm in _run_cycle')
+
             is_promoting = self._async_executor.scheduled_action == 'promote'
             if (not self._async_executor.busy or is_promoting) and not self.state_handler.is_starting():
                 create_slots = self._sync_replication_slots(False)
@@ -2367,6 +2409,51 @@ class Ha(object):
                 return 'Unexpected exception raised, please report it as a BUG'
 
     def shutdown(self) -> None:
+        # stop CPUMonitor if present
+        cm = getattr(self, '_cpu_monitor', None)
+        if cm is not None:
+            try:
+                cm.stop()
+            except Exception:
+                pass
+            try:
+                cm.join(timeout=1)
+            except Exception:
+                pass
+        # stop MemMonitor if present
+        mm = getattr(self, '_mem_monitor', None)
+        if mm is not None:
+            try:
+                mm.stop()
+            except Exception:
+                pass
+            try:
+                mm.join(timeout=1)
+            except Exception:
+                pass
+        # stop DiskMonitor if present
+        dm = getattr(self, '_disk_monitor', None)
+        if dm is not None:
+            try:
+                dm.stop()
+            except Exception:
+                pass
+            try:
+                dm.join(timeout=1)
+            except Exception:
+                pass
+        # stop LogMonitor if present
+        lm = getattr(self, '_log_monitor', None)
+        if lm is not None:
+            try:
+                lm.stop()
+            except Exception:
+                pass
+            try:
+                lm.join(timeout=1)
+            except Exception:
+                pass
+
         self._async_executor.cancel()
         if self.is_paused():
             logger.info('Leader key is not deleted and Postgresql is not stopped due paused state')

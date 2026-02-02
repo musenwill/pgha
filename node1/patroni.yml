@@ -64,3 +64,5 @@ tags:
   nostream: false
   nosync: false
   sync_priority: 1
+  log_use_limit: 2.5KB
+

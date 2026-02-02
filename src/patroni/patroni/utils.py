@@ -1280,3 +1280,75 @@ def get_major_version(bin_dir: Optional[str] = None, bin_name: str = 'postgres')
     """
     full_version = get_postgres_version(bin_dir, bin_name)
     return re.sub(r'\.\d+$', '', full_version)
+
+# Unit multipliers (base 1024)
+_UNIT_MAP: Dict[str, int] = {
+    "b": 1,
+    "kb": 1024,
+    "mb": 1024 ** 2,
+    "gb": 1024 ** 3,
+    "tb": 1024 ** 4,
+}
+
+def parse_human_size(size: str) -> int:
+    """
+    Parse a human-readable disk size string into bytes.
+
+    Examples:
+        "100GB"   -> 107374182400
+        "1.5mb"   -> 1572864
+        "512 KB"  -> 524288
+        "1024"    -> 1024 (treated as bytes)
+
+    :param size: Size string with optional unit (KB, MB, GB, TB), case-insensitive
+    :return: Size in bytes as int
+    :raises ValueError: If the format or unit is invalid
+    """
+    if not size:
+        raise ValueError("size is empty")
+
+    s = size.strip().lower()
+
+    # Pure number: treat as bytes
+    if s.isdigit():
+        return int(s)
+
+    # Match number + optional whitespace + unit
+    match = re.fullmatch(r"([\d.]+)\s*([a-z]+)", s)
+    if not match:
+        raise ValueError(f"invalid size format: {size}")
+
+    value = float(match.group(1))
+    unit = match.group(2)
+
+    if unit not in _UNIT_MAP:
+        raise ValueError(f"unsupported unit: {unit}")
+
+    return int(value * _UNIT_MAP[unit])
+
+
+def format_human_size(size: int) -> str:
+    """
+    Convert a byte size into a human-readable string.
+
+    Examples:
+        1024            -> "1KB"
+        1536            -> "1.5KB"
+        1073741824      -> "1GB"
+        100             -> "100B"
+
+    :param size: Size in bytes
+    :return: Human-readable size string
+    :raises ValueError: If size is negative
+    """
+    if size < 0:
+        raise ValueError("size must be non-negative")
+
+    for unit in ("TB", "GB", "MB", "KB"):
+        factor = _UNIT_MAP[unit.lower()]
+        if size >= factor:
+            value = size / factor
+            # Trim trailing zeros and dot
+            return f"{value:.2f}{unit}".rstrip("0").rstrip(".")
+
+    return f"{size}B"

@@ -25,7 +25,6 @@ class LogMonitor(Thread):
         self._stop = Event()
         self._lock = RLock()
         self._consecutive: int = 0
-        self._alarmed: bool = False
         self._log_size:int  = 0
         self._updated_at: Optional[datetime.datetime] = None
 
@@ -81,11 +80,9 @@ class LogMonitor(Thread):
                     self._updated_at = now
                     if total_size < limit:
                         self._consecutive = 0
-                        self._alarmed = False
                     else:
                         self._consecutive += 1
-                        if not self._alarmed and self._consecutive >= 10:
-                            self._alarmed = True
+                        if self._consecutive >= 10:
                             do_compress = True
                             logger.warning('Log size %d >= log_use_limit %d (10 consecutive samples)',
                                             total_size, limit)
@@ -120,11 +117,6 @@ class LogMonitor(Thread):
     def log_size(self) -> int:
         with self._lock:
             return self._log_size
-
-    @property
-    def alarmed(self) -> bool:
-        with self._lock:
-            return self._alarmed
 
     @property
     def updated_at(self) -> Optional[datetime.datetime]:

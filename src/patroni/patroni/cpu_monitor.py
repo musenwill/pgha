@@ -24,7 +24,6 @@ class CPUMonitor(Thread):
         self._usage: Optional[float] = None
         self._updated_at: Optional[datetime.datetime] = None
         self._consecutive: int = 0
-        self._alarmed: bool = False
 
     def run(self) -> None:
         logger.info('Starting CPU monitor thread, loop wait {} seconds'.format(self._interval))
@@ -45,11 +44,9 @@ class CPUMonitor(Thread):
                     self._updated_at = now
                     if usage < limit:
                         self._consecutive = 0
-                        self._alarmed = False
                     else:
                         self._consecutive += 1
-                        if not self._alarmed and self._consecutive >= 10:
-                            self._alarmed = True
+                        if self._consecutive >= 10:
                             logger.warning('CPU usage %.2f%% >= cpu_use_limit %d%% (10 consecutive samples)', usage, limit)
             except Exception:
                 logger.exception('Exception in CPUMonitor')
@@ -62,11 +59,6 @@ class CPUMonitor(Thread):
     def cpu_usage(self) -> Optional[float]:
         with self._lock:
             return self._usage
-
-    @property
-    def alarmed(self) -> bool:
-        with self._lock:
-            return self._alarmed
 
     @property
     def updated_at(self) -> Optional[datetime.datetime]:

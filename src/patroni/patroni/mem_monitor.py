@@ -25,7 +25,6 @@ class MemMonitor(Thread):
         self._updated_at: Optional[datetime.datetime] = None
         self._total: Optional[int] = None
         self._consecutive: int = 0
-        self._alarmed: bool = False
 
     def run(self) -> None:
         logger.info('Starting Memory monitor thread, loop wait {} seconds'.format(self._interval))
@@ -52,11 +51,9 @@ class MemMonitor(Thread):
                     self._total = total
                     if usage is None or usage < limit:
                         self._consecutive = 0
-                        self._alarmed = False
                     else:
                         self._consecutive += 1
-                        if not self._alarmed and self._consecutive >= 10:
-                            self._alarmed = True
+                        if self._consecutive >= 10:
                             logger.warning('Memory usage %.2f%% >= mem_use_limit %d%% (10 consecutive samples)', usage, limit)
             except Exception:
                 logger.exception('Exception in MemMonitor')
@@ -74,11 +71,6 @@ class MemMonitor(Thread):
     def mem_total(self) -> Optional[int]:
         with self._lock:
             return self._total
-
-    @property
-    def alarmed(self) -> bool:
-        with self._lock:
-            return self._alarmed
 
     @property
     def updated_at(self) -> Optional[datetime.datetime]:

@@ -811,6 +811,21 @@ def dsn(cluster_name: str, group: Optional[int], role: Optional[CtlPostgresqlRol
     click.echo('host={host} port={port}'.format(**params))
 
 
+@ctl.command('nodenum', help='Print number of running nodes')
+@arg_cluster_name
+@option_citus_group
+def nodenum(cluster_name: str, group: Optional[int]) -> None:
+    """Print the number of nodes whose Postgres process is running.
+
+    :param cluster_name: name of the Patroni cluster.
+    :param group: Citus group to check (if applicable).
+    """
+    dcs = get_dcs(cluster_name, group)
+    cluster = dcs.get_cluster()
+    count = sum(1 for m in cluster.members if getattr(m, 'is_running', False))
+    click.echo(str(count))
+
+
 @ctl.command('query', help='Query a Patroni PostgreSQL member')
 @arg_cluster_name
 @option_citus_group

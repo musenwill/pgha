@@ -1578,6 +1578,35 @@ class Ha(object):
         self.touch_member()
         logger.info("Leader key released")
 
+    def _is_postgresql_readonly(self) -> bool:
+        """Check if PostgreSQL is in read-only mode.
+        
+        :returns: `True` if PostgreSQL is in read-only mode, `False` otherwise.
+        """
+        try:
+            result = self.state_handler.query("SHOW default_transaction_read_only")
+            if result and len(result) > 0:
+                return result[0][0].lower() in ('on', 'true', '1', 'yes')
+        except Exception as e:
+            logger.warning('Failed to check PostgreSQL read-only state: %s', e)
+        return False
+
+    def _set_postgresql_readonly(self, readonly: bool = True) -> bool:
+        """Set PostgreSQL read-only mode.
+        
+        :param readonly: `True` to set read-only mode, `False` to restore.
+        :returns: `True` if PostgreSQL is in read-only mode, `False` otherwise.
+        """
+        try:
+            value = 'on' if readonly else 'off'
+            self.state_handler.query(f"ALTER SYSTEM SET default_transaction_read_only = '{value}'")
+            self.state_handler.query('SELECT pg_reload_conf()')
+            logger.info('Set PostgreSQL default_transaction_read_only to %s', value)
+            return True
+        except Exception as e:
+            logger.error('Failed to set PostgreSQL default_transaction_read_only to %s: %s', readonly, e)
+            return False
+
     def demote(self, mode: str) -> Optional[bool]:
         """Demote PostgreSQL running as primary.
 
@@ -2318,13 +2347,21 @@ class Ha(object):
             # If disk monitor signaled alarm and this node holds the leader lock, set Postgres to read-only.
             try:
                 dm = getattr(self, '_disk_monitor', None)
-                if self.has_lock() and dm is not None and getattr(dm, 'alarmed', False):
-                    try:
-                        self.state_handler.query("ALTER SYSTEM SET default_transaction_read_only = 'on'")
-                        self.state_handler.query('SELECT pg_reload_conf()')
-                        logger.warning('Set PostgreSQL to read-only because disk monitor alarm is active')
-                    except Exception:
-                        logger.exception('Failed to set PostgreSQL to read-only due to disk alarm')
+                if self.has_lock() and dm is not None:
+                    # Handle disk alarm: set read-only if alarmed and not already read-only
+                    if dm.alarmed and not dm.has_set_readonly:
+                        if not self._is_postgresql_readonly():
+                            if self._set_postgresql_readonly(True):
+                                dm.has_set_readonly = True
+                                logger.warning('Set PostgreSQL to read-only mode because of disk alarm')
+                        else:
+                            logger.info('PostgreSQL is already in read-only mode')
+
+                    # Handle disk alarm recovery: restore read-write if we had set it to read-only
+                    elif getattr(dm, 'should_restore_readonly', False):
+                        if self._set_postgresql_readonly(False):
+                            dm.has_set_readonly = False
+                            logger.info('Restored PostgreSQL read-write mode after disk alarm recovery')
             except Exception:
                 logger.exception('Exception while honoring DiskMonitor alarm in _run_cycle')
 

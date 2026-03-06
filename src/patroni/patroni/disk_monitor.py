@@ -25,7 +25,9 @@ class DiskMonitor(Thread):
         self._updated_at: Optional[datetime.datetime] = None
         self._total: Optional[int] = None
         self._consecutive: int = 0
+        self._consecutive_below: int = 0
         self._alarmed: bool = False
+        self.has_set_readonly: bool = False
 
     def run(self) -> None:
         logger.info('Starting Disk monitor thread, loop wait {} seconds'.format(self._interval))
@@ -50,7 +52,9 @@ class DiskMonitor(Thread):
                     if usage is None or usage < limit:
                         self._consecutive = 0
                         self._alarmed = False
+                        self._consecutive_below += 1
                     else:
+                        self._consecutive_below = 0
                         self._consecutive += 1
                         if not self._alarmed and self._consecutive >= 10:
                             self._alarmed = True
@@ -76,6 +80,12 @@ class DiskMonitor(Thread):
     def alarmed(self) -> bool:
         with self._lock:
             return self._alarmed
+
+    @property
+    def should_restore_readonly(self) -> bool:
+        """Whether PostgreSQL read-only mode should be restored."""
+        with self._lock:
+            return self.has_set_readonly and self._consecutive_below >= 10 and not self._alarmed
 
     @property
     def updated_at(self) -> Optional[datetime.datetime]:

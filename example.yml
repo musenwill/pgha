@@ -1,65 +1,114 @@
-
-scope: '#FIXME'
+scope: pg-cluster
+namespace: /service/
 name: node1
 
 log:
-  format: '%(asctime)s %(levelname)s: %(message)s'
   level: INFO
-  max_queue_size: 1000
   traceback_level: ERROR
   type: plain
+  format: '%(asctime)s %(levelname)s: %(message)s'
+  dateformat: '%Y-%m-%d %H:%M:%S'
+  max_queue_size: 1000
+  dir: /var/log/patroni
+  file_size: 104857600
+  file_num: 5
+  loggers:
+    patroni.postmaster: WARNING
+    urllib3: WARNING
 
 restapi:
   connect_address: 172.19.0.4:8008
   listen: 172.19.0.4:8008
+  certfile: /etc/patroni/server.crt
+  keyfile: /etc/patroni/server.key
+  keyfile_password: key_pass
+  cafile: /etc/patroni/ca.crt
+  verify_client: optional
+  http_extra_headers:
+    X-Frame-Options: SAMEORIGIN
+  https_extra_headers:
+    X-Frame-Options: SAMEORIGIN
 
-# The bootstrap configuration. Works only when the cluster is not yet initialized.
-# If the cluster is already initialized, all changes in the `bootstrap` section are ignored!
 bootstrap:
-  # This section will be written into <dcs>:/<namespace>/<scope>/config after initializing
-  # new cluster and all other cluster members will use it as a `global configuration`.
-  # WARNING! If you want to change any of the parameters that were set up
-  # via `bootstrap.dcs` section, please use `patronictl edit-config`!
   dcs:
+    ttl: 30
     loop_wait: 10
     retry_timeout: 10
-    ttl: 30
+    maximum_lag_on_failover: 1048576
+    standby_cluster:
+      host: 127.0.0.1
+      port: 1111
+      primary_slot_name: patroni
     postgresql:
-      parameters:
-        hot_standby: 'on'
-        max_connections: 100
-        max_locks_per_transaction: 64
-        max_prepared_transactions: 0
-        max_replication_slots: 10
-        max_wal_senders: 10
-        max_worker_processes: 8
-        track_commit_timestamp: 'off'
-        wal_keep_size: 128MB
-        wal_level: replica
-        wal_log_hints: 'on'
-      use_pg_rewind: true
       use_slots: true
+      use_pg_rewind: true
+      parameters:
+        wal_level: hot_standby
+        hot_standby: "on"
+        max_connections: 100
+        max_worker_processes: 8
+        wal_keep_segments: 8
+        max_wal_senders: 10
+        max_replication_slots: 10
+        max_prepared_transactions: 0
+        max_locks_per_transaction: 64
+        wal_log_hints: "on"
+        track_commit_timestamp: "off"
+        archive_mode: "on"
+        archive_timeout: 1800s
+        archive_command: mkdir -p ../wal_archive && test ! -f ../wal_archive/%f && cp %p ../wal_archive/%f
+      recovery_conf:
+        restore_command: cp ../wal_archive/%f %p
+  initdb:  # Note: It needs to be a list (some options need values, others are switches)
+  - encoding: UTF8
+  - data-checksums
+
+etcd3:
+  hosts:
+    - 10.0.0.1:2379
+    - 10.0.0.2:2379
+    - 10.0.0.3:2379
+  host: 127.0.0.1:2379
+  use_proxies: true
 
 postgresql:
+  listen: 0.0.0.0:5432
+  connect_address: 10.0.0.11:5432
+  data_dir: /var/lib/postgresql/data
+  bin_dir: /usr/lib/postgresql/15/bin
+  config_dir: /var/lib/postgresql/data
+  pgpass: /var/lib/postgresql/.pgpass
   authentication:
     replication:
-      password: '#FIXME'
       username: replicator
-    rewind:
-      password: '#FIXME'
-      username: rewind_user
+      password: repl_pass
     superuser:
-      password: '#FIXME'
       username: postgres
-  bin_dir: ''
-  connect_address: 172.19.0.4:5432
-  data_dir: '#FIXME'
-  listen: 172.19.0.4:5432
+      password: postgres_pass
+    rewind:
+      username: rewind_user
+      password: rewind_pass
   parameters:
-    password_encryption: scram-sha-256
+    unix_socket_directories: '/var/run/postgresql'
+    logging_collector: "on"
+    log_directory: /var/log/postgresql
+    log_filename: postgresql-%Y-%m-%d.log
+  basebackup:
+    checkpoint: fast
+    max-rate: '100M'
   pg_hba:
-  - host all all all scram-sha-256
-  - host replication replicator all scram-sha-256
+    - local all all 0.0.0.0/0 md5
+    - host relication replicator 172.19.0.0/24 md5
+  callbacks:
+    on_start: /usr/local/bin/on_start.sh
+    on_stop: /usr/local/bin/on_stop.sh
+    on_restart: /usr/local/bin/on_restart.sh
+    on_role_change: /usr/local/bin/on_role_change.sh
+
+watchdog:
+  mode: automatic   # off | automatic | required
+  device: /dev/watchdog
+  safety_margin: 5
 
 tags:
   clonefrom: true
@@ -68,3 +117,9 @@ tags:
   nostream: false
   nosync: false
   sync_priority: 1
+  phony_dead_eff_times: 3
+  phony_dead_long_cycle_time: 300
+  cpu_use_limit: 90
+  mem_use_limit: 90
+  disk_use_limit: 90
+  log_use_limit: 100GB

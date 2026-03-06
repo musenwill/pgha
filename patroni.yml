@@ -29,6 +29,10 @@ bootstrap:
     - encoding: UTF8
 
 postgresql:
+  callbacks:
+    on_start: /home/postgres/has_vip.sh
+    on_stop: /home/postgres/has_vip.sh
+    on_role_change: /home/postgres/has_vip.sh
   listen: 0.0.0.0:5432
   connect_address: ${NODE_IP}:5432
   data_dir: /data/postgres

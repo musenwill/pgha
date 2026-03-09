@@ -23,4 +23,9 @@ etcd \
 sleep 5
 
 # 2. 启动 patroni (它会拉起 postgres)
-exec patroni /home/postgres/${NODE_NAME}/patroni.yml
+patroni /home/postgres/${NODE_NAME}/patroni.yml &
+
+while true; do
+    sleep 3600
+done
+

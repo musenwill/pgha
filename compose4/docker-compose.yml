@@ -18,7 +18,7 @@ services:
     ports:
       - "8008:8008"
     user: "postgres:postgres"
-    entrypoint: ["/home/postgres/compose2/entrypoint.sh"]
+    entrypoint: ["/home/postgres/compose4/entrypoint.sh"]
 
   node2:
     image: pgha_centos:260121
@@ -37,7 +37,7 @@ services:
         aliases:
           - node2
     user: "postgres:postgres"
-    entrypoint: ["/home/postgres/compose2/entrypoint.sh"]
+    entrypoint: ["/home/postgres/compose4/entrypoint.sh"]
 
   node3:
     image: pgha_centos:260121
@@ -56,7 +56,7 @@ services:
         aliases:
           - node3
     user: "postgres:postgres"
-    entrypoint: ["/home/postgres/compose2/entrypoint.sh"]
+    entrypoint: ["/home/postgres/compose4/entrypoint.sh"]
 
   client:
     image: pgha_centos:260121

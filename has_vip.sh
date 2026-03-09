@@ -47,7 +47,7 @@ case $cb_name in
     on_role_change)
         if [[ $role == 'primary' ]]||[[ $role == 'master' ]]; then
             addvip
-        elif [[ $role == 'slave' ]]||[[ $role == 'replica' ]]||[[ $role == 'logical' ]]||[[ $role == 'standby' ]]; then
+	else
             delvip
         fi
         ;; 

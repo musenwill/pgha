@@ -687,7 +687,9 @@ class Postgresql(object):
             role = PostgresqlRole.PRIMARY if self.role == PostgresqlRole.PROMOTED else self.role
             try:
                 cmd = shlex.split(self.callback[cb_type]) + [cb_type, role, self.scope]
+                logger.info('Calling callback %s %r %s %s start', cmd, cb_type, role, self.scope)
                 self._callback_executor.call(cmd)
+                logger.info('Calling callback %s %r %s %s end', cmd, cb_type, role, self.scope)
             except Exception:
                 logger.exception('callback %s %r %s %s failed', cmd, cb_type, role, self.scope)
 

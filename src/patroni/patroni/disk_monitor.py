@@ -40,7 +40,8 @@ class DiskMonitor(Thread):
 
         while not self._stop.wait(self._interval):
             try:
-                du = psutil.disk_usage('/')
+                pg_data_dir = self._ha.state_handler.data_dir
+                du = psutil.disk_usage(pg_data_dir)
                 usage = getattr(du, 'percent', None)
                 total = getattr(du, 'total', None)
                 now = datetime.datetime.now(tzutc)

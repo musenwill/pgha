@@ -18,10 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 class LogMonitor(Thread):
-    def __init__(self, ha: Any, interval: int) -> None:
+    def __init__(self, ha: Any) -> None:
         super().__init__(name='patroni-log-monitor', daemon=True)
         self._ha = ha
-        self._interval = max(1, int(interval or 10))
         self._stop = Event()
         self._lock = RLock()
         self._consecutive: int = 0
@@ -59,9 +58,13 @@ class LogMonitor(Thread):
             logger.exception('Exception while compressing log file: %s', path)
 
     def run(self) -> None:
-        logger.info('Starting Log monitor thread, loop wait {} seconds'.format(self._interval))
+        logger.info('Starting Log monitor thread')
     
-        while not self._stop.wait(self._interval):
+        while not self._stop.wait(self.loop_wait):
+            if self.limit <= 0:
+                # log_use_limit <= 0 means disabled, so skip monitoring
+                continue
+
             try:
                 files = self._find_log_files()
                 now = datetime.datetime.now(tzutc)
@@ -125,7 +128,11 @@ class LogMonitor(Thread):
 
     @property
     def limit(self) -> int:
+        return int(self._ha.patroni.log_use_limit)
+
+    @property
+    def loop_wait(self) -> int:
         try:
-            return int(self._ha.patroni.log_use_limit)
+            return max(1, self._ha.dcs.loop_wait)
         except Exception:
-            return 100 * 1024 ** 3
+            return 10

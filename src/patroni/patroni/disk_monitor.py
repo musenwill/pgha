@@ -15,10 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class DiskMonitor(Thread):
-    def __init__(self, ha: Any, interval: int) -> None:
+    def __init__(self, ha: Any) -> None:
         super().__init__(name='patroni-disk-monitor', daemon=True)
         self._ha = ha
-        self._interval = max(1, int(interval or 10))
         self._stop = Event()
         self._lock = RLock()
         self._usage: Optional[float] = None
@@ -30,7 +29,7 @@ class DiskMonitor(Thread):
         self.has_set_readonly: bool = False
 
     def run(self) -> None:
-        logger.info('Starting Disk monitor thread, loop wait {} seconds'.format(self._interval))
+        logger.info('Starting Disk monitor thread')
 
         try:
             import psutil
@@ -38,7 +37,11 @@ class DiskMonitor(Thread):
             logger.warning('psutil is not available, disk monitoring disabled')
             return
 
-        while not self._stop.wait(self._interval):
+        while not self._stop.wait(self.loop_wait):
+            if self.limit <= 0:
+                # disk_use_limit <= 0 means disabled, so skip monitoring
+                continue
+
             try:
                 pg_data_dir = self._ha.state_handler.data_dir
                 du = psutil.disk_usage(pg_data_dir)
@@ -95,8 +98,11 @@ class DiskMonitor(Thread):
 
     @property
     def limit(self) -> int:
+        return int(self._ha.patroni.disk_use_limit)
+
+    @property
+    def loop_wait(self) -> int:
         try:
-            return self._ha.patroni.disk_use_limit
+            return max(1, self._ha.dcs.loop_wait)
         except Exception:
-            logger.warning('Failed fetch disk_use_limit, using default 90')
-            return 90
+            return 10

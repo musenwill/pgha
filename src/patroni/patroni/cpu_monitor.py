@@ -15,10 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class CPUMonitor(Thread):
-    def __init__(self, ha: Any, interval: int) -> None:
+    def __init__(self, ha: Any) -> None:
         super().__init__(name='patroni-cpu-monitor', daemon=True)
         self._ha = ha
-        self._interval = max(1, int(interval or 10))
         self._stop = Event()
         self._lock = RLock()
         self._usage: Optional[float] = None
@@ -26,7 +25,7 @@ class CPUMonitor(Thread):
         self._consecutive: int = 0
 
     def run(self) -> None:
-        logger.info('Starting CPU monitor thread, loop wait {} seconds'.format(self._interval))
+        logger.info('Starting CPU monitor thread')
 
         try:
             import psutil
@@ -34,7 +33,11 @@ class CPUMonitor(Thread):
             logger.warning('psutil is not available, CPU monitoring disabled')
             return
 
-        while not self._stop.wait(self._interval):
+        while not self._stop.wait(self.loop_wait):
+            if self.limit <= 0:
+                # cpu_use_limit <= 0 means disabled, so skip monitoring
+                continue
+
             try:
                 usage = psutil.cpu_percent(interval=None)
                 now = datetime.datetime.now(tzutc)
@@ -67,8 +70,11 @@ class CPUMonitor(Thread):
 
     @property
     def limit(self) -> int:
+        return int(self._ha.patroni.cpu_use_limit)
+
+    @property
+    def loop_wait(self) -> int:
         try:
-            return self._ha.patroni.cpu_use_limit
+            return max(1, self._ha.dcs.loop_wait)
         except Exception:
-            logger.warning('Failed fetch cpu_use_limit, using default 90')
-            return 90
+            return 10

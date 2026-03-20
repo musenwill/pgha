@@ -125,31 +125,28 @@ class Tags(abc.ABC):
 
     @property
     def cpu_use_limit(self) -> int:
-        """CPU usage limit from `tags.cpu_use_limit` as integer percent (default 90)."""
+        """CPU usage limit from `tags.cpu_use_limit` as integer percent (default 90, 0 to disable)."""
         return parse_int(self.tags.get('cpu_use_limit')) or 90
 
     @property
     def mem_use_limit(self) -> int:
-        """Memory usage limit from `tags.mem_use_limit` as integer percent (default 90)."""
+        """Memory usage limit from `tags.mem_use_limit` as integer percent (default 90, 0 to disable)."""
         return parse_int(self.tags.get('mem_use_limit')) or 90
 
     @property
     def disk_use_limit(self) -> int:
-        """Disk usage limit from `tags.disk_use_limit` as integer percent (default 90)."""
+        """Disk usage limit from `tags.disk_use_limit` as integer percent (default 90, 0 to disable)."""
         return parse_int(self.tags.get('disk_use_limit')) or 90
 
     @property
     def log_use_limit(self) -> int:
-        """Log file size threshold from `tags.log_use_limit` in GB (default 100GB).
+        """Log file size threshold from `tags.log_use_limit` in GB (default 100GB, 0 to disable).
 
         Returns size in bytes.
         """
         log_use_limit_cfg = self.tags.get('log_use_limit')
         if log_use_limit_cfg is not None:
-            try:
-                v = parse_human_size(log_use_limit_cfg)
-            except Exception:
-                v = parse_human_size('100GB')
+            v = parse_human_size(log_use_limit_cfg)
         else:
             v = parse_human_size('100GB')
         return v

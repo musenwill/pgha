@@ -270,25 +270,25 @@ class Ha(object):
 
         # start CPU monitor (do not store cpu info in Patroni)
         try:
-            self._cpu_monitor = CPUMonitor(self, self.dcs.loop_wait)
+            self._cpu_monitor = CPUMonitor(self)
             self._cpu_monitor.start()
         except Exception:
             logger.exception('Failed to start CPUMonitor')
         # start Mem monitor
         try:
-            self._mem_monitor = MemMonitor(self, self.dcs.loop_wait)
+            self._mem_monitor = MemMonitor(self)
             self._mem_monitor.start()
         except Exception:
             logger.exception('Failed to start MemMonitor')
         # start Disk monitor
         try:
-            self._disk_monitor = DiskMonitor(self, self.dcs.loop_wait)
+            self._disk_monitor = DiskMonitor(self)
             self._disk_monitor.start()
         except Exception:
             logger.exception('Failed to start DiskMonitor')
         # start Log monitor (postgres .log files)
         try:
-            self._log_monitor = LogMonitor(self, self.dcs.loop_wait)
+            self._log_monitor = LogMonitor(self)
             self._log_monitor.start()
         except Exception:
             logger.exception('Failed to start LogMonitor')

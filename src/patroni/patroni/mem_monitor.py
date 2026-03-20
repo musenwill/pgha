@@ -15,10 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class MemMonitor(Thread):
-    def __init__(self, ha: Any, interval: int) -> None:
+    def __init__(self, ha: Any) -> None:
         super().__init__(name='patroni-mem-monitor', daemon=True)
         self._ha = ha
-        self._interval = max(1, int(interval or 10))
         self._stop = Event()
         self._lock = RLock()
         self._usage: Optional[float] = None
@@ -27,7 +26,7 @@ class MemMonitor(Thread):
         self._consecutive: int = 0
 
     def run(self) -> None:
-        logger.info('Starting Memory monitor thread, loop wait {} seconds'.format(self._interval))
+        logger.info('Starting Memory monitor thread')
 
         try:
             import psutil
@@ -35,7 +34,11 @@ class MemMonitor(Thread):
             logger.warning('psutil is not available, memory monitoring disabled')
             return
 
-        while not self._stop.wait(self._interval):
+        while not self._stop.wait(self.loop_wait):
+            if self.limit <= 0:
+                # mem_use_limit <= 0 means disabled, so skip monitoring
+                continue
+
             try:
                 mem = psutil.virtual_memory()
                 usage = getattr(mem, 'percent', None)
@@ -79,8 +82,11 @@ class MemMonitor(Thread):
 
     @property
     def limit(self) -> int:
+        return int(self._ha.patroni.mem_use_limit)
+
+    @property
+    def loop_wait(self) -> int:
         try:
-            return self._ha.patroni.mem_use_limit
+            return max(1, self._ha.dcs.loop_wait)
         except Exception:
-            logger.warning('Failed fetch mem_use_limit, using default 90')
-            return 90
+            return 10

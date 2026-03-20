@@ -15,7 +15,7 @@ from .collections import CaseInsensitiveSet, EMPTY_DICT
 from .dcs import dcs_modules
 from .exceptions import ConfigParseError, PatroniAssertionError
 from .log import type_logformat
-from .utils import data_directory_is_empty, get_major_version, parse_int, split_host_port
+from .utils import data_directory_is_empty, get_major_version, parse_int, split_host_port, parse_human_size
 
 # Additional parameters to fine-tune validation process
 _validation_params: Dict[str, Any] = {}
@@ -344,6 +344,26 @@ def validate_binary_name(bin_name: str) -> bool:
         raise ConfigParseError(f"does not contain '{bin_name}' in '{bin_dir or '$PATH'}'")
     return True
 
+def validate_disk_size(disk_size: str) -> bool:
+    """Validate the value of ``disk_size`` configuration option.
+
+    The value of *disk_size* must be a string in the format of a number followed by a unit, where the unit can be
+    either ``MB`` or ``GB``, or just no unit.
+
+    :param disk_size: the value of ``disk_size`` configuration option.
+
+    :returns: ``True`` if *disk_size* is valid.
+
+    :raises:
+        :class:`~patroni.exceptions.ConfigParseError` if *disk_size* is not in the expected format.
+    """
+    if not disk_size:
+        return True
+
+    size = parse_human_size(disk_size)
+    if size < 0:
+        raise ValueError(f"negative size is not allowed: {disk_size}")
+    return True
 
 class Result(object):
     """Represent the result of a given validation that was performed.
@@ -975,6 +995,7 @@ setattr(validate_host_port_listen, 'expected_type', str)
 setattr(validate_host_port_listen_multiple_hosts, 'expected_type', str)
 setattr(validate_data_dir, 'expected_type', str)
 setattr(validate_binary_name, 'expected_type', str)
+setattr(validate_disk_size, 'expected_type', str)
 validate_etcd = {
     Or("host", "hosts", "srv", "srv_suffix", "url", "proxy"): Case({
         "host": validate_host_port,
@@ -1197,6 +1218,11 @@ schema = Schema({
             "nosync": bool,
             "sync_priority": IntValidator(min=0, expected_type=int, raise_assert=True),
         }),
-        Optional("nostream"): bool
+        Optional("nostream"): bool,
+
+        Optional('cpu_use_limit'): IntValidator(min=0, max=100, expected_type=int, raise_assert=True),
+        Optional('cpu_mem_limit'): IntValidator(min=0, max=100, expected_type=int, raise_assert=True),
+        Optional('cpu_log_limit'): validate_disk_size,
+        Optional('cpu_disk_limit'): IntValidator(min=0, max=100, expected_type=int, raise_assert=True)
     }
 })

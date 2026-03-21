@@ -344,11 +344,14 @@ def validate_binary_name(bin_name: str) -> bool:
         raise ConfigParseError(f"does not contain '{bin_name}' in '{bin_dir or '$PATH'}'")
     return True
 
-def validate_disk_size(disk_size: str) -> bool:
+def validate_disk_size(disk_size: Any) -> bool:
     """Validate the value of ``disk_size`` configuration option.
 
-    The value of *disk_size* must be a string in the format of a number followed by a unit, where the unit can be
-    either ``MB`` or ``GB``, or just no unit.
+    Accepts:
+      - 0 (disabled)
+      - integer (e.g. 100)
+      - numeric string (e.g. '100')
+      - human size string (e.g. '100GB', '100gb', '20MB')
 
     :param disk_size: the value of ``disk_size`` configuration option.
 
@@ -357,10 +360,31 @@ def validate_disk_size(disk_size: str) -> bool:
     :raises:
         :class:`~patroni.exceptions.ConfigParseError` if *disk_size* is not in the expected format.
     """
-    if not disk_size:
+    if disk_size is None:
         return True
 
-    size = parse_human_size(disk_size)
+    if isinstance(disk_size, (int, float)):
+        if disk_size < 0:
+            raise ValueError(f"negative size is not allowed: {disk_size}")
+        return True
+
+    if not isinstance(disk_size, str):
+        raise ConfigParseError("is not a string")
+
+    if disk_size.strip() == "":
+        raise ConfigParseError("is an empty string")
+
+    try:
+        # numeric string without unit is allowed
+        if disk_size.strip().isdigit():
+            if int(disk_size.strip()) < 0:
+                raise ValueError(f"negative size is not allowed: {disk_size}")
+            return True
+
+        size = parse_human_size(disk_size)
+    except Exception as e:
+        raise ConfigParseError(str(e))
+
     if size < 0:
         raise ValueError(f"negative size is not allowed: {disk_size}")
     return True
@@ -995,7 +1019,7 @@ setattr(validate_host_port_listen, 'expected_type', str)
 setattr(validate_host_port_listen_multiple_hosts, 'expected_type', str)
 setattr(validate_data_dir, 'expected_type', str)
 setattr(validate_binary_name, 'expected_type', str)
-setattr(validate_disk_size, 'expected_type', str)
+setattr(validate_disk_size, 'expected_type', (str, int, float))
 validate_etcd = {
     Or("host", "hosts", "srv", "srv_suffix", "url", "proxy"): Case({
         "host": validate_host_port,
@@ -1221,8 +1245,8 @@ schema = Schema({
         Optional("nostream"): bool,
 
         Optional('cpu_use_limit'): IntValidator(min=0, max=100, expected_type=int, raise_assert=True),
-        Optional('cpu_mem_limit'): IntValidator(min=0, max=100, expected_type=int, raise_assert=True),
-        Optional('cpu_log_limit'): validate_disk_size,
-        Optional('cpu_disk_limit'): IntValidator(min=0, max=100, expected_type=int, raise_assert=True)
+        Optional('mem_use_limit'): IntValidator(min=0, max=100, expected_type=int, raise_assert=True),
+        Optional('log_use_limit'): validate_disk_size,
+        Optional('disk_use_limit'): IntValidator(min=0, max=100, expected_type=int, raise_assert=True)
     }
 })

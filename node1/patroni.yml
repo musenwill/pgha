@@ -63,4 +63,3 @@ tags:
   noloadbalance: false
   nostream: false
   nosync: false
-  sync_priority: 1

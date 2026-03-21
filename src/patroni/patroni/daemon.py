@@ -172,8 +172,9 @@ def abstract_main(cls: Type[AbstractPatroniDaemon], configfile: str) -> None:
     :param configfile:
     """
     from .config import Config, ConfigParseError
+    from .validator import schema
     try:
-        config = Config(configfile)
+        config = Config(configfile, validator=schema)
     except ConfigParseError as e:
         sys.exit(e.value)
 

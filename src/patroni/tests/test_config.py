@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 from patroni import global_config
 from patroni.config import ClusterConfig, Config, ConfigParseError
+from patroni.validator import schema
 
 from .test_ha import get_cluster_initialized_with_only_leader
 
@@ -88,6 +89,18 @@ class TestConfig(unittest.TestCase):
                 config.reload_local_configuration()
             self.assertTrue(config.reload_local_configuration())
             self.assertIsNone(config.reload_local_configuration())
+
+    def test_config_validator_on_startup(self):
+        with patch.object(Config, '_load_config_file', Mock(return_value={'name': 123, 'scope': 'x'})):
+            with self.assertRaises(ConfigParseError):
+                Config('postgres0.yml', validator=schema)
+
+    def test_config_validator_on_reload(self):
+        config = Config(None, validator=schema)
+        with patch.object(Config, '_load_config_file', Mock(return_value={'name': 123, 'scope': 'x'})):
+            with patch('patroni.config.logger') as mock_logger:
+                self.assertIsNone(config.reload_local_configuration())
+                mock_logger.error.assert_called_once()
 
     @patch('tempfile.mkstemp', Mock(return_value=[3000, 'blabla']))
     @patch('os.path.exists', Mock(return_value=True))

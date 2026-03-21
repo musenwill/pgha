@@ -922,10 +922,23 @@ class RestApiHandler(BaseHTTPRequestHandler):
     def do_POST_reload(self) -> None:
         """Handle a ``POST`` request to ``/reload`` path.
 
-        Schedules a reload to Patroni and writes a response with HTTP status ``202``.
+        Validates the configuration first. If validation succeeds, schedules a reload and writes a response with HTTP status ``202``.
+        If validation fails, returns ``400`` with error details.
         """
-        self.server.patroni.sighup_handler()
-        self.write_response(202, 'reload scheduled')
+        try:
+            if self.server.patroni.config.config_file:
+                configuration = self.server.patroni.config._load_config_file()
+                from .validator import schema as schema_validator, populate_validate_params
+
+                populate_validate_params(ignore_listen_port=True)
+                errors = schema_validator(configuration)
+                if errors:
+                    self.write_response(400, "\n".join(errors), content_type='text/plain')
+                    return
+            self.server.patroni.sighup_handler()
+            self.write_response(202, 'reload scheduled')
+        except Exception as e:
+            self.write_response(500, str(e), content_type='text/plain')
 
     def do_GET_failsafe(self) -> None:
         """Handle a ``GET`` request to ``/failsafe`` path.

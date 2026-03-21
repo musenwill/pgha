@@ -19,7 +19,7 @@ from .exceptions import ConfigParseError
 from .file_perm import pg_perm
 from .postgresql.config import ConfigHandler
 from .utils import deep_compare, parse_bool, parse_int, patch_config
-from .validator import IntValidator
+from .validator import IntValidator, schema as schema_validator
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +137,7 @@ class Config(object):
             config_env = os.environ.pop(self.PATRONI_CONFIG_VARIABLE, None)
             self._local_configuration = config_env and yaml.safe_load(config_env) or self.__environment_configuration
 
+        self._validator = validator
         if validator:
             errors = validator(self._local_configuration)
             if errors:
@@ -359,6 +360,16 @@ class Config(object):
         if self.config_file:
             try:
                 configuration = self._load_config_file()
+                if self._validator:
+                    errors = self._validator(configuration)
+                    if errors:
+                        raise ConfigParseError("\n".join(errors))
+                else:
+                    # Ensure schema validation is always applied for reload path when validator is not set.
+                    errors = schema_validator(configuration)
+                    if errors:
+                        raise ConfigParseError("\n".join(errors))
+
                 if not deep_compare(self._local_configuration, configuration):
                     new_configuration = self._build_effective_configuration(self._dynamic_configuration, configuration)
                     self._local_configuration = configuration
@@ -367,6 +378,9 @@ class Config(object):
                     return True
                 else:
                     logger.info('No local configuration items changed.')
+                    return False
+            except ConfigParseError as e:
+                logger.error('New configuration is invalid and was not applied: %s', e)
             except Exception:
                 logger.exception('Exception when reloading local configuration from %s', self.config_file)
 

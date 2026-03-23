@@ -126,17 +126,20 @@ class Tags(abc.ABC):
     @property
     def cpu_use_limit(self) -> int:
         """CPU usage limit from `tags.cpu_use_limit` as integer percent (default 90, 0 to disable)."""
-        return parse_int(self.tags.get('cpu_use_limit')) or 90
+        value = parse_int(self.tags.get('cpu_use_limit'))
+        return value if value is not None else 90
 
     @property
     def mem_use_limit(self) -> int:
         """Memory usage limit from `tags.mem_use_limit` as integer percent (default 90, 0 to disable)."""
-        return parse_int(self.tags.get('mem_use_limit')) or 90
+        value = parse_int(self.tags.get('mem_use_limit'))
+        return value if value is not None else 90
 
     @property
     def disk_use_limit(self) -> int:
         """Disk usage limit from `tags.disk_use_limit` as integer percent (default 90, 0 to disable)."""
-        return parse_int(self.tags.get('disk_use_limit')) or 90
+        value = parse_int(self.tags.get('disk_use_limit'))
+        return value if value is not None else 90
 
     @property
     def log_use_limit(self) -> int:

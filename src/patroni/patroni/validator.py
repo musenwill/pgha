@@ -1009,6 +1009,14 @@ def validate_watchdog_mode(value: Any) -> None:
     assert_(isinstance(value, (str, bool)), "expected type is not a string")
     assert_(value in (False, "off", "automatic", "required"))
 
+def validate_synchronous_mode(value: Any) -> None:
+    """Validate ``synchronous_mode`` configuration option.
+
+    :param value: value of ``synchronous_mode`` to be validated.
+    """
+    assert_(isinstance(value, (str, bool)), "expected type is not a string")
+
+setattr(validate_synchronous_mode, 'expected_type', (str, bool))
 
 userattributes = {"username": "", Optional("password"): ""}
 available_dcs = [m.split(".")[-1] for m in dcs_modules()]
@@ -1121,7 +1129,7 @@ schema = Schema({
                 Optional("archive_cleanup_command"): str,
                 Optional("recovery_min_apply_delay"): str
             },
-            Optional("synchronous_mode"): bool,
+            Optional("synchronous_mode"): validate_synchronous_mode,
             Optional("synchronous_mode_strict"): bool,
             Optional("synchronous_node_count"): IntValidator(min=1, raise_assert=True),
         },
